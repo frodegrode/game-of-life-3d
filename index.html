@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game of Life – 3D Gallery</title>
+<meta name="description" content="Explore Conway's Game of Life on stunning 3D surfaces — spheres, torus knots, Klein bottles, Möbius strips, and more. Interactive, real-time, and mesmerizing.">
+
+<!-- Open Graph (Facebook, Instagram, LinkedIn, iMessage, etc.) -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Game of Life – 3D Gallery">
+<meta property="og:description" content="Watch cellular automata come alive on 20+ extraordinary 3D shapes. Rotate, zoom, and explore Conway's Game of Life like never before.">
+<meta property="og:image" content="https://upload.wikimedia.org/wikipedia/commons/e/e5/Gospers_glider_gun.gif">
+<meta property="og:image:width" content="250">
+<meta property="og:image:height" content="180">
+<meta property="og:image:alt" content="Conway's Game of Life running on 3D surfaces">
+<meta property="og:site_name" content="Game of Life 3D Gallery">
+
+<!-- Twitter / X Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Game of Life – 3D Gallery">
+<meta name="twitter:description" content="Conway's Game of Life on 20+ 3D shapes — spheres, Klein bottles, torus knots, DNA helices, and custom 3D text. Interactive WebGL experience.">
+<meta name="twitter:image" content="https://upload.wikimedia.org/wikipedia/commons/e/e5/Gospers_glider_gun.gif">
+<meta name="twitter:image:alt" content="Conway's Game of Life on 3D surfaces">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a1a; color: #e0e0e0; font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; }
+
+  /* ── Top bar: title + generation ── */
+  #top-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 12;
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    padding: 14px 20px;
+    background: linear-gradient(to bottom, rgba(10,10,26,0.85) 0%, transparent 100%);
+    pointer-events: none;
+  }
+  #info {
+    font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.6);
+    letter-spacing: 0.3px;
+  }
+  #gen {
+    font-size: 12px; color: rgba(79,195,247,0.55);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Bottom control bar ── */
+  #controls {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    background: rgba(10,12,24,0.92); backdrop-filter: blur(20px);
+    padding: 14px 24px; z-index: 10;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+  #controls label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255,255,255,0.4); white-space: nowrap; }
+  #controls input[type=range] { width: 90px; accent-color: #4fc3f7; cursor: pointer; }
+  #controls button {
+    background: rgba(79,195,247,0.08); color: #4fc3f7; border: 1px solid rgba(79,195,247,0.2);
+    padding: 7px 14px; border-radius: 8px; font-size: 12px; cursor: pointer;
+    transition: all 0.2s ease; font-weight: 500; letter-spacing: 0.2px;
+  }
+  #controls button:hover { background: rgba(79,195,247,0.22); border-color: rgba(79,195,247,0.4); }
+  #controls button:active { transform: scale(0.96); }
+  .sep { border-left: 1px solid rgba(255,255,255,0.08); height: 24px; }
+  .ctrl-group { display: flex; align-items: center; gap: 8px; white-space: nowrap; flex-shrink: 0; }
+  #gridVal, #speedVal { min-width: 32px; text-align: center; font-variant-numeric: tabular-nums; font-size: 12px; color: rgba(255,255,255,0.55); }
+
+  /* ── Shape picker toggle button ── */
+  #btnShapes {
+    background: rgba(79,195,247,0.08); color: #4fc3f7; border: 1px solid rgba(79,195,247,0.2);
+    padding: 7px 14px; border-radius: 8px; font-size: 12px; cursor: pointer;
+    transition: all 0.2s ease; font-weight: 500; display: flex; align-items: center; gap: 6px;
+  }
+  #btnShapes:hover { background: rgba(79,195,247,0.22); border-color: rgba(79,195,247,0.4); }
+  #btnShapes .shape-icon { font-size: 14px; }
+
+  /* ── Shape picker panel (slide-out from left) ── */
+  #shape-panel {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 20;
+    width: 240px; max-width: 80vw;
+    background: rgba(10,12,24,0.96); backdrop-filter: blur(24px);
+    border-right: 1px solid rgba(79,195,247,0.1);
+    transform: translateX(-100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  #shape-panel.open { transform: translateX(0); }
+  #shape-panel-header {
+    padding: 20px 20px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  #shape-panel-header h3 {
+    font-size: 13px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1px; color: rgba(255,255,255,0.5);
+  }
+  #btnClosePanel {
+    background: none; border: none; color: rgba(255,255,255,0.4);
+    font-size: 18px; cursor: pointer; padding: 4px; line-height: 1;
+  }
+  #btnClosePanel:hover { color: #4fc3f7; }
+  #shape-list {
+    flex: 1; overflow-y: auto; padding: 12px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  #shape-list::-webkit-scrollbar { width: 4px; }
+  #shape-list::-webkit-scrollbar-thumb { background: rgba(79,195,247,0.2); border-radius: 4px; }
+  .shape-category { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: rgba(255,255,255,0.25); padding: 12px 8px 6px; font-weight: 600; }
+  .shape-btn {
+    background: transparent; color: rgba(255,255,255,0.7); border: none;
+    padding: 10px 12px; border-radius: 8px; font-size: 13px; cursor: pointer;
+    transition: all 0.15s ease; text-align: left; width: 100%;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .shape-btn:hover { background: rgba(79,195,247,0.1); color: #fff; }
+  .shape-btn.active { background: rgba(79,195,247,0.18); color: #4fc3f7; font-weight: 500; }
+  .shape-btn .shape-emoji { font-size: 16px; width: 24px; text-align: center; }
+
+  /* ── Overlay to close panel on mobile ── */
+  #panel-overlay {
+    position: fixed; inset: 0; z-index: 19;
+    background: rgba(0,0,0,0.4); opacity: 0;
+    pointer-events: none; transition: opacity 0.3s;
+  }
+  #panel-overlay.visible { opacity: 1; pointer-events: auto; }
+
+  /* ── Text input for 3D text shape ── */
+  #textInputGroup { display: none; }
+  #textInputGroup.visible { display: flex; }
+  #textInput {
+    width: 130px; background: rgba(0,0,0,0.4); color: #4fc3f7;
+    border: 1px solid rgba(79,195,247,0.25); border-radius: 8px;
+    padding: 6px 10px; font-size: 12px; outline: none;
+    transition: border-color 0.2s;
+  }
+  #textInput:focus { border-color: rgba(79,195,247,0.5); }
+
+  /* ── Splash ── */
+  #splash {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+    background: rgba(10, 14, 30, 0.94); backdrop-filter: blur(20px);
+    border: 1px solid rgba(79,195,247,0.15); border-radius: 20px;
+    padding: 32px 40px; z-index: 20; max-width: 440px; text-align: center;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.5), 0 0 24px rgba(79,195,247,0.06);
+    animation: splashIn 0.6s ease-out;
+  }
+  #splash.fade-out { animation: splashOut 0.8s ease-in forwards; }
+  #splash h2 {
+    font-size: 18px; font-weight: 600; color: #4fc3f7; margin-bottom: 12px;
+    letter-spacing: 0.3px;
+  }
+  #splash p {
+    font-size: 13px; line-height: 1.7; color: rgba(220,230,240,0.75); margin-bottom: 8px;
+  }
+  #splash .hint {
+    font-size: 11px; color: rgba(79,195,247,0.4); margin-top: 14px;
+  }
+  @keyframes splashIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+  @keyframes splashOut {
+    from { opacity: 1; transform: translateX(-50%) translateY(0); }
+    to { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  }
+
+  /* ── Share buttons ── */
+  #share-bar {
+    position: fixed; top: 14px; right: 14px; z-index: 15;
+    display: flex; gap: 6px; align-items: center;
+  }
+  #share-bar .share-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px;
+    color: rgba(255,255,255,0.25); margin-right: 4px;
+  }
+  #share-bar a {
+    display: flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+    transition: all 0.2s ease; text-decoration: none;
+  }
+  #share-bar a:hover { background: rgba(79,195,247,0.2); transform: scale(1.08); border-color: rgba(79,195,247,0.3); }
+  #share-bar svg { width: 14px; height: 14px; fill: rgba(255,255,255,0.6); }
+  #share-bar a:hover svg { fill: #4fc3f7; }
+
+  /* ── Responsive ── */
+  @media (max-width: 700px) {
+    #controls { gap: 10px; padding: 10px 14px; flex-wrap: wrap; }
+    #controls button { padding: 6px 10px; font-size: 11px; }
+    #controls input[type=range] { width: 70px; }
+    #share-bar { top: auto; bottom: 62px; right: 10px; flex-direction: column; gap: 4px; }
+    #shape-panel { width: 220px; }
+    #top-bar { padding: 10px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div id="top-bar">
+  <div id="info">Conway's Game of Life – Sphere</div>
+  <div id="gen">Gen 0</div>
+</div>
+
+<!-- Share buttons -->
+<div id="share-bar">
+  <span class="share-label">Share</span>
+  <a id="shareFB" title="Share on Facebook" target="_blank" rel="noopener">
+    <svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+  </a>
+  <a id="shareX" title="Share on X" target="_blank" rel="noopener">
+    <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+  </a>
+  <a id="shareIG" title="Copy link for Instagram" href="#" onclick="return false;">
+    <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+  </a>
+  <a id="shareTT" title="Copy link for TikTok" href="#" onclick="return false;">
+    <svg viewBox="0 0 24 24"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
+  </a>
+</div>
+
+<!-- Splash -->
+<div id="splash">
+  <h2>Welcome to the Game of Life Gallery</h2>
+  <p>Explore Conway's Game of Life on extraordinary 3D surfaces — from spheres and torus knots to Klein bottles, DNA helices, and even your own custom 3D text.</p>
+  <p>Drag to rotate. Scroll to zoom. Pick a shape and watch life emerge.</p>
+  <div class="hint">Click anywhere or wait to begin</div>
+</div>
+
+<!-- Shape picker panel (slide-out) -->
+<div id="panel-overlay"></div>
+<div id="shape-panel">
+  <div id="shape-panel-header">
+    <h3>Shapes</h3>
+    <button id="btnClosePanel">&times;</button>
+  </div>
+  <div id="shape-list">
+    <div class="shape-category">Basic</div>
+    <button class="shape-btn active" data-shape="sphere"><span class="shape-emoji">&#x1F30D;</span> Sphere</button>
+    <button class="shape-btn" data-shape="plane"><span class="shape-emoji">&#x25FB;</span> Plane</button>
+    <button class="shape-btn" data-shape="torus"><span class="shape-emoji">&#x1F369;</span> Torus</button>
+    <button class="shape-btn" data-shape="cube"><span class="shape-emoji">&#x1F4E6;</span> Cube</button>
+    <button class="shape-btn" data-shape="cylinder"><span class="shape-emoji">&#x1F4CB;</span> Cylinder</button>
+    <button class="shape-btn" data-shape="cone"><span class="shape-emoji">&#x1F4D0;</span> Cone</button>
+
+    <div class="shape-category">Twisted</div>
+    <button class="shape-btn" data-shape="mobius"><span class="shape-emoji">&#x267E;</span> M&ouml;bius</button>
+    <button class="shape-btn" data-shape="chain"><span class="shape-emoji">&#x1F517;</span> Chain</button>
+    <button class="shape-btn" data-shape="klein"><span class="shape-emoji">&#x1F52E;</span> Klein Bottle</button>
+    <button class="shape-btn" data-shape="corkscrew"><span class="shape-emoji">&#x1F300;</span> Corkscrew</button>
+
+    <div class="shape-category">Knots</div>
+    <button class="shape-btn" data-shape="knot"><span class="shape-emoji">&#x1FAA2;</span> Knot (2,3)</button>
+    <button class="shape-btn" data-shape="knot35"><span class="shape-emoji">&#x1FAA2;</span> Knot (3,5)</button>
+    <button class="shape-btn" data-shape="knot23"><span class="shape-emoji">&#x1FAA2;</span> Knot (2,5)</button>
+    <button class="shape-btn" data-shape="knot37"><span class="shape-emoji">&#x1FAA2;</span> Knot (3,7)</button>
+    <button class="shape-btn" data-shape="knot45"><span class="shape-emoji">&#x1FAA2;</span> Knot (4,5)</button>
+    <button class="shape-btn" data-shape="cinquefoil"><span class="shape-emoji">&#x2B50;</span> Cinquefoil</button>
+
+    <div class="shape-category">Organic</div>
+    <button class="shape-btn" data-shape="heart"><span class="shape-emoji">&#x2764;</span> Heart</button>
+    <button class="shape-btn" data-shape="shell"><span class="shape-emoji">&#x1F41A;</span> Seashell</button>
+    <button class="shape-btn" data-shape="helix"><span class="shape-emoji">&#x1F9EC;</span> Double Helix</button>
+    <button class="shape-btn" data-shape="spring"><span class="shape-emoji">&#x1F4A0;</span> Spring</button>
+
+    <div class="shape-category">Mathematical</div>
+    <button class="shape-btn" data-shape="dini"><span class="shape-emoji">&#x1F4C8;</span> Dini</button>
+    <button class="shape-btn" data-shape="enneper"><span class="shape-emoji">&#x1F4C9;</span> Enneper</button>
+    <button class="shape-btn" data-shape="breather"><span class="shape-emoji">&#x1F30A;</span> Breather</button>
+    <button class="shape-btn" data-shape="crosscap"><span class="shape-emoji">&#x1F310;</span> Cross-Cap</button>
+    <button class="shape-btn" data-shape="fig8"><span class="shape-emoji">&#x221E;</span> Figure-8</button>
+
+    <div class="shape-category">Custom</div>
+    <button class="shape-btn" data-shape="text3d"><span class="shape-emoji">&#x1F524;</span> 3D Text</button>
+  </div>
+</div>
+
+<!-- Bottom controls -->
+<div id="controls">
+  <button id="btnShapes"><span class="shape-icon">&#x25F0;</span> Shapes</button>
+  <span class="sep"></span>
+  <span class="ctrl-group">
+    <label for="gridSlider">Grid</label>
+    <input type="range" id="gridSlider" min="16" max="300" value="50" step="2">
+    <span id="gridVal">50&times;25</span>
+  </span>
+  <span class="sep"></span>
+  <span class="ctrl-group">
+    <label for="speedSlider">Speed</label>
+    <input type="range" id="speedSlider" min="1" max="100" value="50">
+    <span id="speedVal">150 ms</span>
+  </span>
+  <span class="sep"></span>
+  <span class="ctrl-group">
+    <button id="btnReset">&#x21BA; Reset</button>
+    <button id="btnSeed">&#x2726; Seeds</button>
+    <button id="btnPause">&#x23F8; Pause</button>
+    <button id="btnFullscreen">&#x26F6; Fullscreen</button>
+  </span>
+  <span id="textInputGroup" class="ctrl-group">
+    <span class="sep"></span>
+    <label for="textInput">Text</label>
+    <input type="text" id="textInput" value="HELLO WORLD" maxlength="20">
+    <button id="btnApplyText">Create</button>
+  </span>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  // --- State ---
+  let cols = 50, rows = 25;
+  let grid, nextGrid;
+  let generation = 0;
+  let paused = false;
+  let mesh, material, texture;
+  let canvas2d, ctx2d;
+  let currentShape = 'sphere';
+
+  // --- Three.js setup ---
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 100);
+  camera.position.z = 4.8;
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  document.body.prepend(renderer.domElement);
+
+  // Starfield
+  const starGeo = new THREE.BufferGeometry();
+  const starVerts = [];
+  for (let i = 0; i < 1200; i++) {
+    starVerts.push((Math.random() - 0.5) * 60, (Math.random() - 0.5) * 60, (Math.random() - 0.5) * 60);
+  }
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x445566, size: 0.08 })));
+
+  // --- 2D canvas for texture ---
+  const cellSize = 8;
+  function createTextureCanvas() {
+    canvas2d = document.createElement('canvas');
+    canvas2d.width = cols * cellSize;
+    canvas2d.height = rows * cellSize;
+    ctx2d = canvas2d.getContext('2d');
+  }
+
+  // --- Grid helpers ---
+  function createGrid() { return new Uint8Array(cols * rows); }
+  function randomize(g, density = 0.32) { for (let i = 0; i < g.length; i++) g[i] = Math.random() < density ? 1 : 0; }
+  function addSeeds(g, density = 0.08) { for (let i = 0; i < g.length; i++) { if (Math.random() < density) g[i] = 1; } }
+
+  let currentText = 'HELLO WORLD';
+
+  // Measure text bitmap dimensions (must match voxel grid for proper GOL alignment)
+  function measureTextBitmap(text) {
+    const tc = document.createElement('canvas');
+    const tctx = tc.getContext('2d');
+    const fh = 24;
+    tctx.font = `bold ${fh}px Arial`;
+    const tw = Math.ceil(tctx.measureText(text).width) + 4;
+    return { W: tw, H: fh + 6 };
+  }
+
+  // Topology sets for getCell wrapping
+  const toroidalShapes = new Set(['torus', 'cube', 'knot', 'knot35', 'knot23', 'knot37', 'knot45', 'cinquefoil', 'spring', 'helix', 'shell', 'cylinder', 'cone']);
+  const mobiusShapes = new Set(['mobius', 'chain', 'corkscrew']);
+  const openShapes = new Set(['dini', 'enneper', 'heart', 'breather', 'crosscap', 'text3d', 'plane']); // clamp both axes
+
+  function getCell(g, x, y) {
+    if (currentShape === 'klein' || currentShape === 'fig8') {
+      let wx = x, wy = ((y % rows) + rows) % rows;
+      if (wx < 0 || wx >= cols) { wx = ((wx % cols) + cols) % cols; wy = (rows - 1) - wy; }
+      return g[wy * cols + wx];
+    }
+    if (mobiusShapes.has(currentShape)) {
+      let wx = x, wy = y;
+      if (wy < 0 || wy >= rows) return 0;
+      if (wx < 0 || wx >= cols) { wx = ((wx % cols) + cols) % cols; wy = (rows - 1) - wy; }
+      return g[wy * cols + wx];
+    }
+    if (toroidalShapes.has(currentShape)) {
+      return g[((y % rows + rows) % rows) * cols + ((x % cols + cols) % cols)];
+    }
+    if (openShapes.has(currentShape)) {
+      if (x < 0 || x >= cols || y < 0 || y >= rows) return 0;
+      return g[y * cols + x];
+    }
+    // sphere default: wrap x, clamp y
+    const wx = ((x % cols) + cols) % cols;
+    if (y < 0 || y >= rows) return 0;
+    return g[y * cols + wx];
+  }
+
+  function step() {
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        let n = 0;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          n += getCell(grid, x + dx, y + dy);
+        }
+        const idx = y * cols + x;
+        nextGrid[idx] = (grid[idx] && (n === 2 || n === 3)) || (!grid[idx] && n === 3) ? 1 : 0;
+      }
+    }
+    [grid, nextGrid] = [nextGrid, grid];
+    generation++;
+  }
+
+  // --- Draw texture ---
+  const aliveColor = [79, 195, 247], deadColor = [8, 10, 22];
+  function drawTexture() {
+    const w = cols * cellSize, h = rows * cellSize;
+    ctx2d.fillStyle = 'rgba(40,55,75,1)';
+    ctx2d.fillRect(0, 0, w, h);
+    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+      const c = grid[y * cols + x] ? aliveColor : deadColor;
+      ctx2d.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+      ctx2d.fillRect(x * cellSize + 1, y * cellSize + 1, cellSize - 1, cellSize - 1);
+    }
+    texture.needsUpdate = true;
+  }
+
+  // ============================================================
+  //  PARAMETRIC GEOMETRY HELPERS
+  // ============================================================
+
+  // Generic: build BufferGeometry from a parametric function f(u,v) → {x,y,z}
+  function buildParametric(f, segU, segV, uRange, vRange) {
+    const verts = [], uvs = [], idx = [];
+    for (let j = 0; j <= segV; j++) {
+      const v = vRange[0] + (j / segV) * (vRange[1] - vRange[0]);
+      for (let i = 0; i <= segU; i++) {
+        const u = uRange[0] + (i / segU) * (uRange[1] - uRange[0]);
+        const p = f(u, v);
+        verts.push(p.x, p.y, p.z);
+        uvs.push(i / segU, j / segV);
+      }
+    }
+    for (let j = 0; j < segV; j++) for (let i = 0; i < segU; i++) {
+      const a = j * (segU + 1) + i, b = a + 1, c = a + (segU + 1), d = c + 1;
+      idx.push(a, b, d, a, d, c);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  // --- Möbius strip ---
+  function createMobiusGeometry() {
+    return buildParametric((u, v) => {
+      const theta = u * Math.PI * 2, half = u * Math.PI;
+      const s = (v - 0.5) * 2; // -1..1
+      return {
+        x: (1 + 0.5 * s * Math.cos(half)) * Math.cos(theta),
+        y: (1 + 0.5 * s * Math.cos(half)) * Math.sin(theta),
+        z: 0.5 * s * Math.sin(half)
+      };
+    }, 128, 32, [0, 1], [0, 1]);
+  }
+
+  // --- Klein bottle (classic bottle) ---
+  function createKleinGeometry() {
+    const sc = 0.07;
+    return buildParametric((u, v) => {
+      const cU = Math.cos(u), sU = Math.sin(u), cV = Math.cos(v), sV = Math.sin(v);
+      const r = 1 - cU / 2;
+      let x, y, z;
+      if (u < Math.PI) {
+        x = 6 * cU * (1 + sU) + 4 * r * cU * cV;
+        y = 16 * sU + 4 * r * sU * cV;
+      } else {
+        x = 6 * cU * (1 + sU) - 4 * r * cV;
+        y = 16 * sU;
+      }
+      z = 4 * r * sV;
+      return { x: x * sc, y: y * sc, z: z * sc };
+    }, 128, 64, [0, Math.PI * 2], [0, Math.PI * 2]);
+  }
+
+  // --- Dini's surface (twisted pseudosphere) ---
+  function createDiniGeometry() {
+    const a = 1, b = 0.15;
+    return buildParametric((u, v) => ({
+      x: a * Math.cos(u) * Math.sin(v) * 0.5,
+      y: a * Math.sin(u) * Math.sin(v) * 0.5,
+      z: (a * (Math.cos(v) + Math.log(Math.tan(v / 2 + 0.01))) + b * u) * 0.12
+    }), 128, 64, [0, Math.PI * 4], [0.1, Math.PI - 0.1]);
+  }
+
+  // --- Enneper's minimal surface ---
+  function createEnneperGeometry() {
+    const sc = 0.25;
+    return buildParametric((u, v) => ({
+      x: (u - u * u * u / 3 + u * v * v) * sc,
+      y: (v - v * v * v / 3 + v * u * u) * sc,
+      z: (u * u - v * v) * sc
+    }), 64, 64, [-2, 2], [-2, 2]);
+  }
+
+  // --- Heart shape ---
+  function createHeartGeometry() {
+    const sc = 0.08;
+    return buildParametric((u, v) => {
+      const cu = Math.cos(u), su = Math.sin(u), cv = Math.cos(v), sv = Math.sin(v);
+      const x = 16 * su * su * su;
+      const y = 13 * cu - 5 * Math.cos(2 * u) - 2 * Math.cos(3 * u) - Math.cos(4 * u);
+      // Extrude around the 2D heart curve using v
+      const r = 0.6 + 0.4 * sv;
+      return { x: x * sc * r, y: y * sc * r, z: Math.cos(v) * 1.2 };
+    }, 96, 32, [0, Math.PI * 2], [0, Math.PI * 2]);
+  }
+
+  // --- Spring (helical tube) ---
+  function createSpringGeometry() {
+    const R = 0.8, r = 0.2, coils = 3;
+    return buildParametric((u, v) => {
+      const theta = u * Math.PI * 2 * coils;
+      const phi = v * Math.PI * 2;
+      const cx = R * Math.cos(theta), cy = R * Math.sin(theta), cz = u * coils * 0.6 - coils * 0.3;
+      // Direction along the helix
+      const tx = -R * Math.sin(theta), ty = R * Math.cos(theta), tz = coils * 0.6 / (Math.PI * 2 * coils);
+      const tl = Math.sqrt(tx * tx + ty * ty + tz * tz);
+      const Tx = tx / tl, Ty = ty / tl, Tz = tz / tl;
+      // Normal and binormal
+      const Nx = -Math.cos(theta), Ny = -Math.sin(theta), Nz = 0;
+      const Bx = Ty * Nz - Tz * Ny, By = Tz * Nx - Tx * Nz, Bz = Tx * Ny - Ty * Nx;
+      return {
+        x: cx + r * (Math.cos(phi) * Nx + Math.sin(phi) * Bx),
+        y: cy + r * (Math.cos(phi) * Ny + Math.sin(phi) * By),
+        z: cz + r * (Math.cos(phi) * Nz + Math.sin(phi) * Bz)
+      };
+    }, 256, 32, [0, 1], [0, 1]);
+  }
+
+  // --- Seashell (logarithmic spiral shell) ---
+  function createShellGeometry() {
+    return buildParametric((u, v) => {
+      const n = 5.5; // spirals
+      const h = 3.5; // height
+      const p = 1.4; // power (how fast it opens)
+      const eu = Math.pow(Math.E, u / (6 * Math.PI));
+      const cosV = Math.cos(v), sinV = Math.sin(v);
+      const r = 1 - v / (2 * Math.PI);
+      return {
+        x: 0.3 * eu * (1 + cosV) * Math.cos(u),
+        y: 0.3 * eu * (1 + cosV) * Math.sin(u),
+        z: 0.3 * (eu * sinV - Math.pow(Math.E, u / (3 * Math.PI)) - 1)
+      };
+    }, 160, 48, [0, Math.PI * 2 * 2.5], [0, Math.PI * 2]);
+  }
+
+  // --- Breather surface (soliton) ---
+  function createBreatherGeometry() {
+    const aa = 0.4; // parameter 0 < aa < 1
+    const w = Math.sqrt(1 - aa * aa);
+    const sc = 0.4;
+    return buildParametric((u, v) => {
+      const d = aa * (Math.pow(w * Math.cosh(aa * u), 2) + Math.pow(aa * Math.sin(w * v), 2));
+      return {
+        x: sc * (-u + (2 * (1 - aa * aa) * Math.cosh(aa * u) * Math.sinh(aa * u)) / d),
+        y: sc * (2 * w * Math.cosh(aa * u) * (-(w * Math.cos(v) * Math.cos(w * v)) - Math.sin(v) * Math.sin(w * v))) / d,
+        z: sc * (2 * w * Math.cosh(aa * u) * (-(w * Math.sin(v) * Math.cos(w * v)) + Math.cos(v) * Math.sin(w * v))) / d
+      };
+    }, 128, 64, [-14, 14], [-12.4, 12.4]);
+  }
+
+  // --- Cross-cap (non-orientable, self-intersecting) ---
+  function createCrossCapGeometry() {
+    return buildParametric((u, v) => ({
+      x: Math.cos(u) * Math.sin(2 * v) * 0.9,
+      y: Math.sin(u) * Math.sin(2 * v) * 0.9,
+      z: (Math.cos(v) * Math.cos(v) - Math.cos(u) * Math.cos(u) * Math.sin(v) * Math.sin(v)) * 0.9
+    }), 64, 64, [0, Math.PI], [0, Math.PI]);
+  }
+
+  // --- Figure-8 immersion (Klein variant) ---
+  function createFig8Geometry() {
+    const r = 1.2;
+    return buildParametric((u, v) => {
+      const cosU = Math.cos(u), sinU = Math.sin(u);
+      const cosHU = Math.cos(u / 2), sinHU = Math.sin(u / 2);
+      const sinV = Math.sin(v), sin2V = Math.sin(2 * v);
+      const a = cosHU * sinV - sinHU * sin2V;
+      return {
+        x: (r + a) * cosU * 0.55,
+        y: (r + a) * sinU * 0.55,
+        z: (sinHU * sinV + cosHU * sin2V) * 0.55
+      };
+    }, 128, 64, [0, Math.PI * 2], [0, Math.PI * 2]);
+  }
+
+  // --- Double Helix (DNA-style, two intertwined tubes) ---
+  function createHelixGeometry() {
+    // Single helix tube
+    function helixTube(offset) {
+      const R = 0.6, r = 0.12, coils = 3, height = 2.4;
+      return buildParametric((u, v) => {
+        const theta = u * Math.PI * 2 * coils + offset;
+        const phi = v * Math.PI * 2;
+        const cx = R * Math.cos(theta), cy = R * Math.sin(theta);
+        const cz = (u - 0.5) * height;
+        const tx = -R * Math.sin(theta), ty = R * Math.cos(theta);
+        const tz = height / (Math.PI * 2 * coils);
+        const tl = Math.sqrt(tx*tx + ty*ty + tz*tz);
+        const Nx = -Math.cos(theta), Ny = -Math.sin(theta), Nz = 0;
+        const Bx = (ty*Nz - tz*Ny)/tl, By = (tz*Nx - tx*Nz)/tl, Bz = (tx*Ny - ty*Nx)/tl;
+        return {
+          x: cx + r * (Math.cos(phi) * Nx + Math.sin(phi) * Bx),
+          y: cy + r * (Math.cos(phi) * Ny + Math.sin(phi) * By),
+          z: cz + r * (Math.cos(phi) * Nz + Math.sin(phi) * Bz)
+        };
+      }, 192, 24, [0, 1], [0, 1]);
+    }
+    // Merge two helix geometries
+    const g1 = helixTube(0), g2 = helixTube(Math.PI);
+    const merged = new THREE.BufferGeometry();
+    // Combine positions
+    const p1 = g1.getAttribute('position').array, p2 = g2.getAttribute('position').array;
+    const u1 = g1.getAttribute('uv').array, u2 = g2.getAttribute('uv').array;
+    const n1 = g1.getAttribute('normal').array, n2 = g2.getAttribute('normal').array;
+    const i1 = g1.index.array, i2 = g2.index.array;
+    const offset = p1.length / 3;
+    const newIdx = new Uint32Array(i1.length + i2.length);
+    newIdx.set(i1); for (let i = 0; i < i2.length; i++) newIdx[i1.length + i] = i2[i] + offset;
+    merged.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array([...p1, ...p2]), 3));
+    merged.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array([...u1, ...u2]), 2));
+    merged.setAttribute('normal', new THREE.Float32BufferAttribute(new Float32Array([...n1, ...n2]), 3));
+    merged.setIndex(new THREE.BufferAttribute(newIdx, 1));
+    return merged;
+  }
+
+  // --- Corkscrew (twisted ribbon) ---
+  function createCorkscrewGeometry() {
+    const R = 0.7, w = 0.35, twists = 4, height = 2.2;
+    return buildParametric((u, v) => {
+      const theta = u * Math.PI * 2 * twists;
+      const s = (v - 0.5) * 2; // -1..1
+      const cx = R * Math.cos(theta), cy = R * Math.sin(theta);
+      const cz = (u - 0.5) * height;
+      // Twist the ribbon around the helix
+      const Nx = -Math.cos(theta), Ny = -Math.sin(theta);
+      const twist = u * Math.PI * twists * 2; // full twists
+      const ct = Math.cos(twist), st = Math.sin(twist);
+      return {
+        x: cx + w * s * (Nx * ct),
+        y: cy + w * s * (Ny * ct),
+        z: cz + w * s * st
+      };
+    }, 256, 16, [0, 1], [0, 1]);
+  }
+
+  // --- 3D Text (voxel-extruded letters) ---
+  function createText3DGeometry(text) {
+    // 1. Render text to a canvas to get a pixel bitmap
+    const tc = document.createElement('canvas');
+    const tctx = tc.getContext('2d');
+    const fh = 24;
+    tctx.font = `bold ${fh}px Arial`;
+    const tw = Math.ceil(tctx.measureText(text).width) + 4;
+    tc.width = tw; tc.height = fh + 6;
+    tctx.fillStyle = '#000'; tctx.fillRect(0, 0, tc.width, tc.height);
+    tctx.font = `bold ${fh}px Arial`; tctx.fillStyle = '#fff';
+    tctx.textBaseline = 'top';
+    tctx.fillText(text, 2, 2);
+    const imgData = tctx.getImageData(0, 0, tc.width, tc.height);
+    const W = tc.width, H = tc.height;
+
+    // 2. Build bitmap
+    const bmp = new Uint8Array(W * H);
+    for (let i = 0; i < W * H; i++) bmp[i] = imgData.data[i * 4] > 100 ? 1 : 0;
+
+    // 3. Build voxel geometry with "unfolded box" UV layout:
+    //    The GOL grid is (W+2D) x (H+2D). The front face occupies the center,
+    //    and side faces fold out into the border cells. This ensures GOL cells
+    //    on side faces are proper neighbors of front face edge cells.
+    const D = 2; // depth in voxels
+    const TW = W + 2 * D, TH = H + 2 * D; // total GOL grid size
+    const verts = [], uvArr = [], idxArr = [];
+    let vi = 0;
+
+    function isSet(x, y, z) {
+      if (z < 0 || z >= D || x < 0 || x >= W || y < 0 || y >= H) return false;
+      return bmp[y * W + x] === 1;
+    }
+
+    function addQuad(p0, p1, p2, p3, u0, v0, u1, v1) {
+      verts.push(...p0, ...p1, ...p2, ...p3);
+      uvArr.push(u0, v0, u1, v0, u1, v1, u0, v1);
+      idxArr.push(vi, vi+1, vi+2, vi, vi+2, vi+3);
+      vi += 4;
+    }
+
+    // Scale: center the text and normalize size
+    const sc = 2.0 / Math.max(W, H);
+    const ox = -W * sc / 2, oy = H * sc / 2, oz = -D * sc / 2;
+
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        if (!bmp[y * W + x]) continue;
+
+        // Front face UV: center region of the expanded grid
+        const fu0 = (D + x) / TW, fu1 = (D + x + 1) / TW;
+        const fv0 = (D + y) / TH, fv1 = (D + y + 1) / TH;
+
+        for (let z = 0; z < D; z++) {
+          const x0 = ox + x * sc, x1 = ox + (x+1) * sc;
+          const y0 = oy - y * sc, y1 = oy - (y+1) * sc;
+          const z0 = oz + z * sc, z1 = oz + (z+1) * sc;
+
+          // Front face (z-): center of GOL grid
+          if (!isSet(x, y, z - 1))
+            addQuad([x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0], fu0,fv0,fu1,fv1);
+          // Back face (z+): same GOL cell as front
+          if (!isSet(x, y, z + 1))
+            addQuad([x1,y0,z1],[x0,y0,z1],[x0,y1,z1],[x1,y1,z1], fu0,fv0,fu1,fv1);
+
+          // Top face (y-): folds into top border, z=0 is adjacent to front
+          if (!isSet(x, y - 1, z)) {
+            const su0 = (D + x) / TW, su1 = (D + x + 1) / TW;
+            const sv0 = (D - 1 - z) / TH, sv1 = (D - z) / TH;
+            addQuad([x0,y0,z1],[x1,y0,z1],[x1,y0,z0],[x0,y0,z0], su0,sv0,su1,sv1);
+          }
+          // Bottom face (y+): folds into bottom border
+          if (!isSet(x, y + 1, z)) {
+            const su0 = (D + x) / TW, su1 = (D + x + 1) / TW;
+            const sv0 = (D + H + z) / TH, sv1 = (D + H + z + 1) / TH;
+            addQuad([x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1], su0,sv0,su1,sv1);
+          }
+          // Left face (x-): folds into left border
+          if (!isSet(x - 1, y, z)) {
+            const su0 = (D - 1 - z) / TW, su1 = (D - z) / TW;
+            const sv0 = (D + y) / TH, sv1 = (D + y + 1) / TH;
+            addQuad([x0,y0,z1],[x0,y0,z0],[x0,y1,z0],[x0,y1,z1], su0,sv0,su1,sv1);
+          }
+          // Right face (x+): folds into right border
+          if (!isSet(x + 1, y, z)) {
+            const su0 = (D + W + z) / TW, su1 = (D + W + z + 1) / TW;
+            const sv0 = (D + y) / TH, sv1 = (D + y + 1) / TH;
+            addQuad([x1,y0,z0],[x1,y0,z1],[x1,y1,z1],[x1,y1,z0], su0,sv0,su1,sv1);
+          }
+        }
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvArr, 2));
+    geo.setIndex(idxArr);
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  // ============================================================
+  //  CREATE GEOMETRY SWITCH
+  // ============================================================
+  function createGeometry(shape) {
+    switch (shape) {
+      case 'plane':   return new THREE.PlaneGeometry(4, 4, 1, 1);
+      case 'torus':   return new THREE.TorusGeometry(0.85, 0.4, 48, 64);
+      case 'cube':    return new THREE.BoxGeometry(1.5, 1.5, 1.5, 1, 1, 1);
+      case 'mobius':  return createMobiusGeometry();
+      case 'klein':   return createKleinGeometry();
+      case 'knot':      return new THREE.TorusKnotGeometry(0.7, 0.25, 128, 32, 2, 3);
+      case 'knot35':    return new THREE.TorusKnotGeometry(0.7, 0.2, 192, 32, 3, 5);
+      case 'knot23':    return new THREE.TorusKnotGeometry(0.7, 0.22, 160, 32, 2, 5);
+      case 'knot37':    return new THREE.TorusKnotGeometry(0.65, 0.18, 256, 32, 3, 7);
+      case 'knot45':    return new THREE.TorusKnotGeometry(0.65, 0.18, 256, 32, 4, 5);
+      case 'cinquefoil': return new THREE.TorusKnotGeometry(0.7, 0.2, 192, 32, 5, 2);
+      case 'spring':  return createSpringGeometry();
+      case 'dini':    return createDiniGeometry();
+      case 'enneper': return createEnneperGeometry();
+      case 'heart':   return createHeartGeometry();
+      case 'shell':   return createShellGeometry();
+      case 'breather': return createBreatherGeometry();
+      case 'crosscap': return createCrossCapGeometry();
+      case 'fig8':    return createFig8Geometry();
+      case 'helix':   return createHelixGeometry();
+      case 'corkscrew': return createCorkscrewGeometry();
+      case 'cylinder': return new THREE.CylinderGeometry(0.8, 0.8, 2, 64, 1, true);
+      case 'cone':     return new THREE.ConeGeometry(1, 2, 64, 1, true);
+      case 'text3d':   return createText3DGeometry(currentText);
+      case 'sphere':
+      default:        return new THREE.SphereGeometry(1, 64, 48);
+    }
+  }
+
+  // ============================================================
+  //  DISPOSE + BUILD
+  // ============================================================
+  function disposeMesh() {
+    if (!mesh) return;
+    if (mesh.isGroup) {
+      mesh.children.forEach(c => { c.geometry.dispose(); c.material.dispose(); });
+    } else { mesh.geometry.dispose(); }
+    if (material) material.dispose();
+    if (texture) texture.dispose();
+    scene.remove(mesh);
+    mesh = null;
+  }
+
+  const doubleSideShapes = new Set(['mobius', 'chain', 'klein', 'dini', 'enneper', 'heart', 'crosscap', 'fig8', 'corkscrew', 'breather', 'cylinder', 'cone', 'plane']);
+
+  function buildMesh() {
+    disposeMesh();
+    createTextureCanvas();
+    grid = createGrid(); nextGrid = createGrid();
+    if (currentShape === 'text3d') {
+      // Only randomize the front-face region; border (side faces) starts dead
+      grid.fill(0);
+      const dims = measureTextBitmap(currentText);
+      const D = 2;
+      for (let y = 0; y < dims.H; y++) {
+        for (let x = 0; x < dims.W; x++) {
+          if (Math.random() < 0.32) grid[(D + y) * cols + (D + x)] = 1;
+        }
+      }
+    } else {
+      randomize(grid);
+    }
+    generation = 0;
+
+    texture = new THREE.CanvasTexture(canvas2d);
+    texture.minFilter = THREE.NearestFilter;
+    texture.magFilter = THREE.NearestFilter;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+
+    material = new THREE.MeshStandardMaterial({
+      map: texture, roughness: 0.55, metalness: 0.15,
+      emissiveMap: texture, emissive: new THREE.Color(0x4fc3f7), emissiveIntensity: 0.45,
+      side: doubleSideShapes.has(currentShape) ? THREE.DoubleSide : THREE.FrontSide,
+    });
+
+    if (currentShape === 'chain') {
+      const group = new THREE.Group();
+      const g1 = createMobiusGeometry(), g2 = createMobiusGeometry();
+      const m1 = new THREE.Mesh(g1, material), m2 = new THREE.Mesh(g2, material);
+      m2.rotation.x = Math.PI / 2;
+      m2.position.x = 1.15;
+      group.add(m1, m2);
+      mesh = group;
+    } else {
+      mesh = new THREE.Mesh(createGeometry(currentShape), material);
+    }
+
+    scene.add(mesh);
+    drawTexture();
+
+    const names = {
+      sphere:'Sphere', plane:'Plane', torus:'Torus', cube:'Cube', mobius:'Möbius Strip',
+      chain:'Möbius Chain', klein:'Klein Bottle',
+      knot:'Torus Knot (2,3)', knot35:'Torus Knot (3,5)', knot23:'Torus Knot (2,5)',
+      knot37:'Torus Knot (3,7)', knot45:'Torus Knot (4,5)', cinquefoil:'Cinquefoil (5,2)',
+      spring:'Spring', dini:"Dini's Surface", enneper:"Enneper's Surface", heart:'Heart',
+      shell:'Seashell', breather:'Breather Surface', crosscap:'Cross-Cap', fig8:'Figure-8',
+      helix:'Double Helix', corkscrew:'Corkscrew',
+      cylinder:'Cylinder', cone:'Cone', text3d: currentText
+    };
+    document.getElementById('info').textContent = `Conway's Game of Life – ${names[currentShape]}`;
+  }
+
+  // --- Lighting ---
+  scene.add(new THREE.AmbientLight(0x334455, 0.6));
+  const dl = new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(3, 2, 4); scene.add(dl);
+  const rl = new THREE.DirectionalLight(0x4fc3f7, 0.3); rl.position.set(-3, -1, -2); scene.add(rl);
+
+  // --- Animation ---
+  let lastStep = 0, stepInterval = 150;
+  let isDragging = false, prevMouse = { x: 0, y: 0 };
+  let userQuat = new THREE.Quaternion(), autoAngle = 0;
+
+  function animate(time) {
+    requestAnimationFrame(animate);
+    if (mesh) {
+      autoAngle += 0.003;
+      const aq = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), autoAngle);
+      const wq = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0), 0.15 * Math.sin(time * 0.0002));
+      mesh.quaternion.copy(userQuat).multiply(aq).multiply(wq);
+    }
+    if (!paused && time - lastStep > stepInterval) {
+      step(); drawTexture(); lastStep = time;
+      document.getElementById('gen').textContent = `Gen ${generation.toLocaleString()}`;
+    }
+    renderer.render(scene, camera);
+  }
+
+  // --- Mouse / touch ---
+  renderer.domElement.addEventListener('pointerdown', e => { isDragging = true; prevMouse = { x: e.clientX, y: e.clientY }; });
+  window.addEventListener('pointerup', () => isDragging = false);
+  window.addEventListener('pointermove', e => {
+    if (!isDragging || !mesh) return;
+    const dx = e.clientX - prevMouse.x, dy = e.clientY - prevMouse.y;
+    userQuat.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), dx * 0.005));
+    userQuat.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0), dy * 0.005));
+    prevMouse = { x: e.clientX, y: e.clientY };
+  });
+  renderer.domElement.addEventListener('wheel', e => {
+    e.preventDefault();
+    camera.position.z = Math.min(8, Math.max(1.2, camera.position.z + e.deltaY * 0.003));
+  }, { passive: false });
+  let lastPinch = 0;
+  renderer.domElement.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) lastPinch = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  });
+  renderer.domElement.addEventListener('touchmove', e => {
+    if (e.touches.length === 2) {
+      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      camera.position.z = Math.min(8, Math.max(1.2, camera.position.z + (lastPinch - d) * 0.008));
+      lastPinch = d;
+    }
+  });
+
+  // --- Controls ---
+  const slider = document.getElementById('gridSlider'), gridVal = document.getElementById('gridVal');
+  const speedSlider = document.getElementById('speedSlider'), speedVal = document.getElementById('speedVal');
+
+  // colsMultiplier: multiply cols to compensate for UV stretch on elongated shapes
+  // e.g. 1.67 means 67% more cols → cells become 60% as wide
+  const colsMultiplier = {
+    knot: 3.3, knot35: 5.7, knot23: 5, knot37: 6.7, knot45: 6.7,
+    cinquefoil: 10, spring: 4, mobius: 1.5, chain: 1.5, dini: 1.2,
+    shell: 2, helix: 5, corkscrew: 6, text3d: 2
+  };
+  function updateGrid() {
+    const base = parseInt(slider.value);
+    if (currentShape === 'text3d') {
+      // Expanded grid: text bitmap + D-wide border on each side for side faces
+      const dims = measureTextBitmap(currentText);
+      const D = 2;
+      cols = dims.W + 2 * D;
+      rows = dims.H + 2 * D;
+    } else {
+      const cMult = colsMultiplier[currentShape] || 1;
+      cols = Math.round(base * cMult);
+      rows = Math.max(8, Math.round(base / 2));
+    }
+    gridVal.textContent = `${cols}×${rows}`;
+  }
+  function updateSpeed() { const t = parseInt(speedSlider.value) / 100; stepInterval = Math.round(500 * Math.pow(5/500, t)); speedVal.textContent = `${stepInterval} ms`; }
+
+  // --- Shape panel ---
+  const shapePanel = document.getElementById('shape-panel');
+  const panelOverlay = document.getElementById('panel-overlay');
+  const btnShapes = document.getElementById('btnShapes');
+  const btnClosePanel = document.getElementById('btnClosePanel');
+
+  function openShapePanel() { shapePanel.classList.add('open'); panelOverlay.classList.add('visible'); }
+  function closeShapePanel() { shapePanel.classList.remove('open'); panelOverlay.classList.remove('visible'); }
+
+  btnShapes.addEventListener('click', openShapePanel);
+  btnClosePanel.addEventListener('click', closeShapePanel);
+  panelOverlay.addEventListener('click', closeShapePanel);
+
+  // Text input group
+  const textInputGroup = document.getElementById('textInputGroup');
+  const textInput = document.getElementById('textInput');
+  const btnApplyText = document.getElementById('btnApplyText');
+
+  function showTextInput(show) {
+    textInputGroup.classList.toggle('visible', show);
+  }
+
+  btnApplyText.addEventListener('click', () => {
+    currentText = textInput.value || 'HELLO';
+    updateGrid(); buildMesh();
+  });
+  textInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { btnApplyText.click(); }
+    e.stopPropagation();
+  });
+
+  // Shape buttons
+  document.querySelectorAll('.shape-btn[data-shape]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.shape-btn[data-shape]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentShape = btn.dataset.shape;
+      showTextInput(currentShape === 'text3d');
+      updateGrid(); buildMesh();
+      closeShapePanel();
+    });
+  });
+
+  slider.addEventListener('input', () => { updateGrid(); buildMesh(); });
+  document.getElementById('btnReset').addEventListener('click', () => { updateGrid(); buildMesh(); });
+  document.getElementById('btnSeed').addEventListener('click', () => { addSeeds(grid, 0.1); drawTexture(); });
+  document.getElementById('btnPause').addEventListener('click', function() {
+    paused = !paused; this.textContent = paused ? '▶ Play' : '⏸ Pause';
+  });
+  speedSlider.addEventListener('input', updateSpeed);
+
+  // Fullscreen toggle
+  const btnFs = document.getElementById('btnFullscreen');
+  btnFs.addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen();
+    }
+  });
+  document.addEventListener('fullscreenchange', () => {
+    btnFs.textContent = document.fullscreenElement ? '⛶ Exit' : '⛶ Fullscreen';
+  });
+
+  window.addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+  // --- Share links ---
+  const shareTitle = "Game of Life – 3D Gallery";
+  const shareText = "Conway's Game of Life on 20+ 3D shapes — spheres, Klein bottles, torus knots, and custom 3D text! Check it out:";
+  const shareUrl = window.location.href;
+  const encodedUrl = encodeURIComponent(shareUrl);
+  const encodedText = encodeURIComponent(shareText);
+  const encodedTitle = encodeURIComponent(shareTitle);
+
+  // Facebook (uses OG tags for preview)
+  document.getElementById('shareFB').href =
+    `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`;
+
+  // X / Twitter (uses twitter:card meta for preview)
+  document.getElementById('shareX').href =
+    `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
+
+  // Instagram & TikTok don't support direct URL sharing — copy link to clipboard
+  function copyLinkWithToast(platform) {
+    navigator.clipboard.writeText(`${shareText} ${shareUrl}`).then(() => {
+      const toast = document.createElement('div');
+      toast.textContent = `Link copied! Paste it in your ${platform} post.`;
+      toast.style.cssText = 'position:fixed;top:60px;right:14px;background:rgba(10,14,30,0.92);color:#4fc3f7;padding:10px 18px;border-radius:10px;font-size:12px;z-index:30;border:1px solid rgba(79,195,247,0.25);animation:splashIn 0.3s ease-out;';
+      document.body.appendChild(toast);
+      setTimeout(() => { toast.style.animation = 'splashOut 0.5s ease-in forwards'; setTimeout(() => toast.remove(), 500); }, 2500);
+    });
+  }
+
+  document.getElementById('shareIG').addEventListener('click', () => copyLinkWithToast('Instagram'));
+  document.getElementById('shareTT').addEventListener('click', () => copyLinkWithToast('TikTok'));
+
+  // --- Splash screen ---
+  const splash = document.getElementById('splash');
+  function dismissSplash() {
+    if (!splash || splash.classList.contains('fade-out')) return;
+    splash.classList.add('fade-out');
+    setTimeout(() => splash.remove(), 800);
+  }
+  // Auto-dismiss after 8 seconds, or on any click/key
+  setTimeout(dismissSplash, 8000);
+  window.addEventListener('pointerdown', dismissSplash, { once: true });
+  window.addEventListener('keydown', dismissSplash, { once: true });
+  window.addEventListener('wheel', dismissSplash, { once: true });
+
+  // --- Init ---
+  updateGrid(); updateSpeed(); buildMesh(); requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>
