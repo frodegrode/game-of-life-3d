@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Game of Life – 3D Gallery</title>
 <meta name="description" content="Explore Conway's Game of Life on stunning 3D surfaces — spheres, torus knots, Klein bottles, Möbius strips, and more. Interactive, real-time, and mesmerizing.">
 
@@ -341,7 +341,7 @@
     starVerts.push((Math.random() - 0.5) * 60, (Math.random() - 0.5) * 60, (Math.random() - 0.5) * 60);
   }
   starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3));
-  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x445566, size: 0.08 })));
+  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x445566, size: 0.08, depthTest: true, depthWrite: false })));
 
   // --- 2D canvas for texture ---
   const cellSize = 8;
@@ -961,6 +961,10 @@
       lastPinch = d;
     }
   }, { passive: false });
+
+  // Prevent Safari gesture zoom (iOS)
+  document.addEventListener('gesturestart', e => e.preventDefault(), { passive: false });
+  document.addEventListener('gesturechange', e => e.preventDefault(), { passive: false });
 
   renderer.domElement.addEventListener('touchend', e => {
     if (e.touches.length === 0) {
